@@ -4,51 +4,85 @@
     ViewData["Title"] = "Edit Address";
 }
 
-<h1>Edit Address</h1>
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-xl-6">
+            <div class="mb-4">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a asp-action="Index">Addresses</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">Edit</li>
+                    </ol>
+                </nav>
+                <h1 class="fw-bold mb-1">Edit Address</h1>
+                <p class="text-muted">Update the address information below</p>
+            </div>
 
-<hr />
-<div class="row">
-    <div class="col-md-6">
-        <form asp-action="Edit">
-            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            
-            <input type="hidden" asp-for="Id" />
-            
-            <div class="form-group mb-3">
-                <label asp-for="Street" class="form-label"></label>
-                <input asp-for="Street" class="form-control" />
-                <span asp-validation-for="Street" class="text-danger"></span>
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4">
+                    <form asp-action="Edit">
+                        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+                        
+                        <input type="hidden" asp-for="Id" />
+                        
+                        <div class="mb-3">
+                            <label asp-for="Street" class="form-label fw-semibold">
+                                Street Address <span class="text-danger">*</span>
+                            </label>
+                            <input asp-for="Street" class="form-control form-control-lg" placeholder="Enter street address" />
+                            <span asp-validation-for="Street" class="text-danger small"></span>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label asp-for="City" class="form-label fw-semibold">
+                                    City <span class="text-danger">*</span>
+                                </label>
+                                <input asp-for="City" class="form-control form-control-lg" placeholder="Enter city" />
+                                <span asp-validation-for="City" class="text-danger small"></span>
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <label asp-for="State" class="form-label fw-semibold">
+                                    State <span class="text-danger">*</span>
+                                </label>
+                                <input asp-for="State" class="form-control form-control-lg" placeholder="State" />
+                                <span asp-validation-for="State" class="text-danger small"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="ZipCode" class="form-label fw-semibold">
+                                    Zip Code <span class="text-danger">*</span>
+                                </label>
+                                <input asp-for="ZipCode" class="form-control form-control-lg" placeholder="Enter zip code" />
+                                <span asp-validation-for="ZipCode" class="text-danger small"></span>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="Country" class="form-label fw-semibold">
+                                    Country <span class="text-danger">*</span>
+                                </label>
+                                <input asp-for="Country" class="form-control form-control-lg" placeholder="Enter country" />
+                                <span asp-validation-for="Country" class="text-danger small"></span>
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4" />
+                        
+                        <div class="d-flex gap-2 justify-content-end">
+                            <a asp-action="Index" class="btn btn-lg btn-light">
+                                <i class="bi bi-x-circle me-2"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-lg btn-primary">
+                                <i class="bi bi-save me-2"></i>Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
-            
-            <div class="form-group mb-3">
-                <label asp-for="City" class="form-label"></label>
-                <input asp-for="City" class="form-control" />
-                <span asp-validation-for="City" class="text-danger"></span>
-            </div>
-            
-            <div class="form-group mb-3">
-                <label asp-for="State" class="form-label"></label>
-                <input asp-for="State" class="form-control" />
-                <span asp-validation-for="State" class="text-danger"></span>
-            </div>
-            
-            <div class="form-group mb-3">
-                <label asp-for="ZipCode" class="form-label"></label>
-                <input asp-for="ZipCode" class="form-control" />
-                <span asp-validation-for="ZipCode" class="text-danger"></span>
-            </div>
-            
-            <div class="form-group mb-3">
-                <label asp-for="Country" class="form-label"></label>
-                <input asp-for="Country" class="form-control" />
-                <span asp-validation-for="Country" class="text-danger"></span>
-            </div>
-            
-            <div class="form-group">
-                <input type="submit" value="Save" class="btn btn-primary" />
-                <a asp-action="Index" class="btn btn-secondary">Back to List</a>
-            </div>
-        </form>
+        </div>
     </div>
 </div>
 

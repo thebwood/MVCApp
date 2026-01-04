@@ -4,62 +4,93 @@
     ViewData["Title"] = "Addresses";
 }
 
-<h1>Addresses</h1>
-
-<p>
-    <a asp-action="Create" class="btn btn-primary">Create New</a>
-</p>
-
-@if (TempData["Success"] != null)
-{
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        @TempData["Success"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="fw-bold mb-1">Address Management</h1>
+                    <p class="text-muted mb-0">Manage your address book</p>
+                </div>
+                <a asp-action="Create" class="btn btn-primary btn-lg shadow-sm">
+                    <i class="bi bi-plus-circle me-2"></i>Add New Address
+                </a>
+            </div>
+        </div>
     </div>
-}
 
-@if (TempData["Error"] != null)
-{
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        @TempData["Error"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i>@TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>@TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="px-4 py-3 fw-semibold">Street</th>
+                            <th class="py-3 fw-semibold">City</th>
+                            <th class="py-3 fw-semibold">State</th>
+                            <th class="py-3 fw-semibold">Zip Code</th>
+                            <th class="py-3 fw-semibold">Country</th>
+                            <th class="py-3 fw-semibold text-end pe-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model != null && Model.Any())
+                        {
+                            @foreach (var item in Model)
+                            {
+                                <tr>
+                                    <td class="px-4 py-3">
+                                        <div class="fw-medium">@item.Street</div>
+                                    </td>
+                                    <td class="py-3">@item.City</td>
+                                    <td class="py-3">@item.State</td>
+                                    <td class="py-3">
+                                        <span class="badge bg-secondary">@item.ZipCode</span>
+                                    </td>
+                                    <td class="py-3">@item.Country</td>
+                                    <td class="py-3 text-end pe-4">
+                                        <div class="btn-group" role="group">
+                                            <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-outline-primary" title="Edit">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </a>
+                                            <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-sm btn-outline-danger" title="Delete">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center py-5">
+                                    <div class="text-muted">
+                                        <i class="bi bi-inbox display-1 d-block mb-3"></i>
+                                        <p class="mb-0">No addresses found. Click "Add New Address" to get started.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
-}
-
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>Street</th>
-            <th>City</th>
-            <th>State</th>
-            <th>Zip Code</th>
-            <th>Country</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        @if (Model != null && Model.Any())
-        {
-            @foreach (var item in Model)
-            {
-                <tr>
-                    <td>@item.Street</td>
-                    <td>@item.City</td>
-                    <td>@item.State</td>
-                    <td>@item.ZipCode</td>
-                    <td>@item.Country</td>
-                    <td>
-                        <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-warning">Edit</a>
-                        <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-sm btn-danger">Delete</a>
-                    </td>
-                </tr>
-            }
-        }
-        else
-        {
-            <tr>
-                <td colspan="6" class="text-center">No addresses found.</td>
-            </tr>
-        }
-    </tbody>
-</table>
+</div>
