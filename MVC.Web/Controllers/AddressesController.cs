@@ -1,42 +1,33 @@
 using Microsoft.AspNetCore.Mvc;
 using MVC.Web.Models;
-using System.Text;
-using System.Text.Json;
+using MVC.Web.Services;
 
 namespace MVC.Web.Controllers
 {
     public class AddressesController : Controller
     {
-        private readonly IHttpClientFactory _httpClientFactory;
-        private readonly IConfiguration _configuration;
-        private readonly string _apiBaseUrl;
+        private readonly IAddressApiService _addressApiService;
+        private readonly ILogger<AddressesController> _logger;
 
-        public AddressesController(IHttpClientFactory httpClientFactory, IConfiguration configuration)
+        public AddressesController(IAddressApiService addressApiService, ILogger<AddressesController> logger)
         {
-            _httpClientFactory = httpClientFactory;
-            _configuration = configuration;
-            _apiBaseUrl = _configuration["ApiSettings:BaseUrl"] ?? "https://localhost:7208";
+            _addressApiService = addressApiService;
+            _logger = logger;
         }
 
         // GET: Addresses
         public async Task<IActionResult> Index()
         {
-            var client = _httpClientFactory.CreateClient();
-            var response = await client.GetAsync($"{_apiBaseUrl}/api/addresses");
+            var result = await _addressApiService.GetAllAddressesAsync();
 
-            if (response.IsSuccessStatusCode)
+            if (result.IsFailure)
             {
-                var content = await response.Content.ReadAsStringAsync();
-                var addresses = JsonSerializer.Deserialize<List<AddressDto>>(content, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-
-                return View(addresses ?? new List<AddressDto>());
+                _logger.LogWarning("Failed to load addresses: {Error}", result.Error);
+                TempData["Error"] = result.Error;
+                return View(new List<AddressDto>());
             }
 
-            TempData["Error"] = "Failed to load addresses";
-            return View(new List<AddressDto>());
+            return View(result.Value);
         }
 
         // GET: Addresses/Create
@@ -55,45 +46,32 @@ namespace MVC.Web.Controllers
                 return View(createAddressDto);
             }
 
-            var client = _httpClientFactory.CreateClient();
-            var json = JsonSerializer.Serialize(createAddressDto);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var result = await _addressApiService.CreateAddressAsync(createAddressDto);
 
-            var response = await client.PostAsync($"{_apiBaseUrl}/api/addresses", content);
-
-            if (response.IsSuccessStatusCode)
+            if (result.IsFailure)
             {
-                TempData["Success"] = "Address created successfully";
-                return RedirectToAction(nameof(Index));
+                _logger.LogWarning("Failed to create address: {Error}", result.Error);
+                ModelState.AddModelError("", result.Error);
+                return View(createAddressDto);
             }
 
-            var errorContent = await response.Content.ReadAsStringAsync();
-            ModelState.AddModelError("", $"Failed to create address: {errorContent}");
-            return View(createAddressDto);
+            TempData["Success"] = "Address created successfully";
+            return RedirectToAction(nameof(Index));
         }
 
         // GET: Addresses/Edit/5
         public async Task<IActionResult> Edit(Guid id)
         {
-            var client = _httpClientFactory.CreateClient();
-            var response = await client.GetAsync($"{_apiBaseUrl}/api/addresses/{id}");
+            var result = await _addressApiService.GetAddressByIdAsync(id);
 
-            if (response.IsSuccessStatusCode)
+            if (result.IsFailure)
             {
-                var content = await response.Content.ReadAsStringAsync();
-                var address = JsonSerializer.Deserialize<AddressDto>(content, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-
-                if (address != null)
-                {
-                    return View(address);
-                }
+                _logger.LogWarning("Failed to load address {AddressId}: {Error}", id, result.Error);
+                TempData["Error"] = result.Error;
+                return RedirectToAction(nameof(Index));
             }
 
-            TempData["Error"] = "Address not found";
-            return RedirectToAction(nameof(Index));
+            return View(result.Value);
         }
 
         // POST: Addresses/Edit/5
@@ -106,45 +84,32 @@ namespace MVC.Web.Controllers
                 return View(updateAddressDto);
             }
 
-            var client = _httpClientFactory.CreateClient();
-            var json = JsonSerializer.Serialize(updateAddressDto);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var result = await _addressApiService.UpdateAddressAsync(id, updateAddressDto);
 
-            var response = await client.PutAsync($"{_apiBaseUrl}/api/addresses/{id}", content);
-
-            if (response.IsSuccessStatusCode)
+            if (result.IsFailure)
             {
-                TempData["Success"] = "Address updated successfully";
-                return RedirectToAction(nameof(Index));
+                _logger.LogWarning("Failed to update address {AddressId}: {Error}", id, result.Error);
+                ModelState.AddModelError("", result.Error);
+                return View(updateAddressDto);
             }
 
-            var errorContent = await response.Content.ReadAsStringAsync();
-            ModelState.AddModelError("", $"Failed to update address: {errorContent}");
-            return View(updateAddressDto);
+            TempData["Success"] = "Address updated successfully";
+            return RedirectToAction(nameof(Index));
         }
 
         // GET: Addresses/Delete/5
         public async Task<IActionResult> Delete(Guid id)
         {
-            var client = _httpClientFactory.CreateClient();
-            var response = await client.GetAsync($"{_apiBaseUrl}/api/addresses/{id}");
+            var result = await _addressApiService.GetAddressByIdAsync(id);
 
-            if (response.IsSuccessStatusCode)
+            if (result.IsFailure)
             {
-                var content = await response.Content.ReadAsStringAsync();
-                var address = JsonSerializer.Deserialize<AddressDto>(content, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
-
-                if (address != null)
-                {
-                    return View(address);
-                }
+                _logger.LogWarning("Failed to load address {AddressId} for deletion: {Error}", id, result.Error);
+                TempData["Error"] = result.Error;
+                return RedirectToAction(nameof(Index));
             }
 
-            TempData["Error"] = "Address not found";
-            return RedirectToAction(nameof(Index));
+            return View(result.Value);
         }
 
         // POST: Addresses/Delete/5
@@ -152,16 +117,16 @@ namespace MVC.Web.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(Guid id)
         {
-            var client = _httpClientFactory.CreateClient();
-            var response = await client.DeleteAsync($"{_apiBaseUrl}/api/addresses/{id}");
+            var result = await _addressApiService.DeleteAddressAsync(id);
 
-            if (response.IsSuccessStatusCode)
+            if (result.IsFailure)
             {
-                TempData["Success"] = "Address deleted successfully";
+                _logger.LogWarning("Failed to delete address {AddressId}: {Error}", id, result.Error);
+                TempData["Error"] = result.Error;
                 return RedirectToAction(nameof(Index));
             }
 
-            TempData["Error"] = "Failed to delete address";
+            TempData["Success"] = "Address deleted successfully";
             return RedirectToAction(nameof(Index));
         }
     }
