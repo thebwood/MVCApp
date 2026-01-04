@@ -5,3 +5,8 @@
 /MVC.Web/bin/Debug/net10.0
 /.vs
 /MVC.Web/obj
+
+# Serilog log files
+logs/
+*.log
+/MVC.Web/logs/

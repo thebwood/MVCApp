@@ -2,61 +2,116 @@ using MVC.Web.Middleware;
 using MVC.Web.Services;
 using Polly;
 using Polly.Extensions.Http;
+using Serilog;
+using Serilog.Events;
 
-var builder = WebApplication.CreateBuilder(args);
+// Configure Serilog
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+    .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+    .MinimumLevel.Override("System.Net.Http.HttpClient", LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .Enrich.WithEnvironmentName()
+    .Enrich.WithThreadId()
+    .Enrich.WithProcessId()
+    .Enrich.WithProcessName()
+    .WriteTo.Console(
+        outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}{NewLine}{Message:lj}{NewLine}{Exception}")
+    .WriteTo.File(
+        path: "logs/mvc-web-.log",
+        rollingInterval: RollingInterval.Day,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}",
+        retainedFileCountLimit: 30,
+        fileSizeLimitBytes: 10485760) // 10MB
+    .CreateLogger();
 
-// Configure Logging
-builder.Logging.ClearProviders();
-builder.Logging.AddConsole();
-builder.Logging.AddDebug();
-builder.Logging.AddEventSourceLogger();
-
-// Add services to the container.
-builder.Services.AddControllersWithViews();
-
-// Register the Address API Service
-builder.Services.AddScoped<IAddressApiService, AddressApiService>();
-
-// Configure HttpClient with Polly resilience policies
-builder.Services.AddHttpClient("AddressApi")
-    .AddPolicyHandler(GetRetryPolicy())
-    .AddPolicyHandler(GetCircuitBreakerPolicy())
-    .SetHandlerLifetime(TimeSpan.FromMinutes(5));
-
-// Also add the default HttpClient factory for backward compatibility
-builder.Services.AddHttpClient();
-
-var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
+try
 {
-    // Use custom exception handling middleware in production
-    app.UseMiddleware<ExceptionHandlingMiddleware>();
-    app.UseHsts();
+    Log.Information("Starting MVC.Web application");
+
+    var builder = WebApplication.CreateBuilder(args);
+
+    // Add Serilog to the logging pipeline
+    builder.Host.UseSerilog();
+
+    // Add services to the container.
+    builder.Services.AddControllersWithViews();
+
+    // Register the Address API Service
+    builder.Services.AddScoped<IAddressApiService, AddressApiService>();
+
+    // Configure HttpClient with Polly resilience policies
+    builder.Services.AddHttpClient("AddressApi")
+        .AddPolicyHandler(GetRetryPolicy())
+        .AddPolicyHandler(GetCircuitBreakerPolicy())
+        .SetHandlerLifetime(TimeSpan.FromMinutes(5));
+
+    // Also add the default HttpClient factory for backward compatibility
+    builder.Services.AddHttpClient();
+
+    var app = builder.Build();
+
+    // Configure the HTTP request pipeline.
+    if (!app.Environment.IsDevelopment())
+    {
+        // Use custom exception handling middleware in production
+        app.UseMiddleware<ExceptionHandlingMiddleware>();
+        app.UseHsts();
+    }
+    else
+    {
+        // Use developer exception page in development
+        app.UseDeveloperExceptionPage();
+    }
+
+    // Add Serilog request logging
+    app.UseSerilogRequestLogging(options =>
+    {
+        options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000}ms";
+        options.GetLevel = (httpContext, elapsed, ex) => ex != null
+            ? LogEventLevel.Error
+            : httpContext.Response.StatusCode > 499
+                ? LogEventLevel.Error
+                : httpContext.Response.StatusCode > 399
+                    ? LogEventLevel.Warning
+                    : LogEventLevel.Information;
+        options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+        {
+            diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value);
+            diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
+            diagnosticContext.Set("UserAgent", httpContext.Request.Headers["User-Agent"].ToString());
+            diagnosticContext.Set("RemoteIpAddress", httpContext.Connection.RemoteIpAddress?.ToString());
+        };
+    });
+
+    // Add custom request logging middleware for additional tracking
+    app.UseMiddleware<RequestLoggingMiddleware>();
+
+    app.UseHttpsRedirection();
+    app.UseRouting();
+
+    app.UseAuthorization();
+
+    app.MapStaticAssets();
+
+    app.MapControllerRoute(
+        name: "default",
+        pattern: "{controller=Home}/{action=Index}/{id?}")
+        .WithStaticAssets();
+
+    Log.Information("MVC.Web application started successfully");
+    
+    app.Run();
 }
-else
+catch (Exception ex)
 {
-    // Use developer exception page in development
-    app.UseDeveloperExceptionPage();
+    Log.Fatal(ex, "Application terminated unexpectedly");
 }
-
-// Add request logging middleware
-app.UseMiddleware<RequestLoggingMiddleware>();
-
-app.UseHttpsRedirection();
-app.UseRouting();
-
-app.UseAuthorization();
-
-app.MapStaticAssets();
-
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}")
-    .WithStaticAssets();
-
-app.Run();
+finally
+{
+    Log.CloseAndFlush();
+}
 
 // Retry policy: Retry 3 times with exponential backoff
 static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
@@ -68,8 +123,7 @@ static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
             sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
             onRetry: (outcome, timespan, retryCount, context) =>
             {
-                var logger = context.GetLogger();
-                logger?.LogWarning(
+                Log.Warning(
                     "Retry {RetryCount} after {Delay}s due to {Reason}",
                     retryCount,
                     timespan.TotalSeconds,
@@ -87,32 +141,13 @@ static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy()
             durationOfBreak: TimeSpan.FromSeconds(30),
             onBreak: (outcome, duration, context) =>
             {
-                var logger = context.GetLogger();
-                logger?.LogWarning(
+                Log.Warning(
                     "Circuit breaker opened for {Duration}s due to {Reason}",
                     duration.TotalSeconds,
                     outcome.Exception?.Message ?? outcome.Result.StatusCode.ToString());
             },
             onReset: context =>
             {
-                var logger = context.GetLogger();
-                logger?.LogInformation("Circuit breaker reset");
+                Log.Information("Circuit breaker reset");
             });
-}
-
-// Extension method to get logger from Polly context
-static class PollyContextExtensions
-{
-    private const string LoggerKey = "Logger";
-
-    public static Context WithLogger(this Context context, ILogger logger)
-    {
-        context[LoggerKey] = logger;
-        return context;
-    }
-
-    public static ILogger? GetLogger(this Context context)
-    {
-        return context.TryGetValue(LoggerKey, out var logger) ? logger as ILogger : null;
-    }
 }
